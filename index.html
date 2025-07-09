@@ -128,13 +128,14 @@
             $('#summarySkeleton').show()
             $('#summaryContent').hide()
 
-            const source = new EventSource('http://localhost:3333/api/layanan/semantic-search-ai-stream?' + new URLSearchParams({
+            const source = new EventSource('http://localhost:3333/api/public/search/semantic-search-ai-stream?' + new URLSearchParams({
                 query: query,
                 limit: 5
             }))
 
             source.addEventListener('results', function (e) {
                 const data = JSON.parse(e.data)
+                console.log('Received results:', data.results)
                 renderResults(data.results)
             })
 
