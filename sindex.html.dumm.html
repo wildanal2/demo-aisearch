@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>AI Semantic Search Demo</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ✅ Tambahkan markdown parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-4xl mx-auto py-10 px-6">
+        <h1 class="text-3xl font-bold text-center mb-6">AI Semantic Search Demo</h1>
+
+        <!-- Search Form -->
+        <div class="flex items-center mb-6">
+            <input id="queryInput" type="text"
+                class="flex-grow border border-gray-300 rounded-l px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Cari layanan..." />
+            <button id="searchBtn" class="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600">
+                Search
+            </button>
+        </div>
+
+        <!-- Ringkasan AI -->
+        <div id="summarySection" class="bg-white rounded shadow p-6 mb-6 hidden">
+            <h2 class="text-xl font-semibold mb-2">Ringkasan AI</h2>
+            <!-- ✅ summaryContent akan di-render dari markdown -->
+            <div id="summaryContent" class="prose prose-sm max-w-none leading-relaxed"></div>
+        </div>
+
+        <!-- Hasil Pencarian -->
+        <div id="resultsSection" class="bg-white rounded shadow p-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Hasil Pencarian</h2>
+            <div id="resultsList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <script>
+        $('#searchBtn1').on('click', function () {
+            const query = $('#queryInput').val().trim()
+            if (!query) return alert('Masukkan kata kunci pencarian')
+
+            $.ajax({
+                url: 'http://localhost:3333/api/layanan/semantic-search-ai',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ query, limit: 5 }),
+                success: function (res) {
+                    // ✅ Render summary with markdown
+                    const summary = res.summary || 'Tidak ada ringkasan.'
+                    const summaryHtml = marked.parse(summary)
+                    $('#summaryContent').html(summaryHtml)
+                    $('#summarySection').removeClass('hidden')
+
+                    // Render results
+                    const results = res.results || []
+                    const resultsHtml = results.map(r => `
+                        <div class="flex items-start gap-4 border-b pb-4">
+                        <img src="${r.icon}" alt="${r.nama}" class="w-14 h-14 object-contain rounded bg-gray-100" />
+                        <div>
+                            <h3 class="font-semibold text-lg">${r.nama}</h3>
+                            <p class="text-sm text-gray-600 mt-1">${r.deskripsi}</p>
+                            <a href="${r.url}" target="_blank" class="text-blue-600 text-sm mt-1 inline-block hover:underline">
+                            Kunjungi layanan →
+                            </a>
+                        </div>
+                        </div>
+                    `).join('')
+                    $('#resultsList').html(resultsHtml)
+                    $('#resultsSection').removeClass('hidden')
+                },
+                error: function (err) {
+                    alert('Terjadi kesalahan saat mengambil data.')
+                    console.error(err)
+                },
+            })
+        })
+
+        function renderResults(results) {
+            const resultsHtml = results.map(r => `
+                <div class="flex items-start gap-4 border-b pb-4">
+                <img src="${r.icon}" alt="${r.nama}" class="w-14 h-14 object-contain rounded bg-gray-100" />
+                <div>
+                    <h3 class="font-semibold text-lg">${r.nama}</h3>
+                    <p class="text-sm text-gray-600 mt-1">${r.deskripsi}</p>
+                    <a href="${r.url}" target="_blank" class="text-blue-600 text-sm mt-1 inline-block hover:underline">
+                    Kunjungi layanan →
+                    </a>
+                </div>
+                </div>
+            `).join('')
+
+            $('#resultsList').html(resultsHtml)
+            $('#resultsSection').removeClass('hidden')
+        }
+
+        function runSearchStream(query) {
+            const source = new EventSource('http://localhost:3333/api/layanan/semantic-search-ai-stream?' + new URLSearchParams({
+                query: query,
+                limit: 5
+            }))
+
+            source.addEventListener('results', function (e) {
+                const data = JSON.parse(e.data)
+                console.log(data)
+                renderResults(data.results)
+                $('#summaryContent').html('<em>Memuat ringkasan AI...</em>')
+            })
+
+            source.addEventListener('summary', function (e) {
+                const data = JSON.parse(e.data)
+                console.log(data)
+                const summaryHtml = marked.parse(data.summary || '')
+                $('#summaryContent').html(summaryHtml)
+                source.close()
+            })
+
+            source.addEventListener('error', function (e) {
+                console.error('SSE error:', e)
+                source.close()
+            })
+        }
+
+        $('#searchBtn').on('click', function () {
+            const query = $('#queryInput').val().trim()
+            if (!query) return alert('Masukkan kata kunci pencarian')
+            runSearchStream(query)
+        })
+    </script>
+</body>
+
+</html>

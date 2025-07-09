@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>AI Semantic Search Demo</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 🔆 Shimmer Animation -->
+    <style>
+        @keyframes shimmer {
+            0% {
+                background-position: -500px 0;
+            }
+
+            100% {
+                background-position: 500px 0;
+            }
+        }
+
+        .shimmer {
+            animation: shimmer 1.5s infinite linear;
+            background: linear-gradient(to right, #f3f4f6 0%, #e5e7eb 20%, #f3f4f6 40%, #f3f4f6 100%);
+            background-size: 1000px 100%;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-4xl mx-auto py-10 px-6">
+        <h1 class="text-3xl font-bold text-center mb-6">AI Semantic Search Demo</h1>
+
+        <!-- Search Form -->
+        <div class="flex items-center mb-6">
+            <input id="queryInput" type="text"
+                class="flex-grow border border-gray-300 rounded-l px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Cari layanan..." />
+            <button id="searchBtn"
+                class="bg-blue-500 text-white px-4 py-2 rounded-r hover:bg-blue-600 flex items-center gap-2">
+                <span id="searchText">Search</span>
+                <svg id="searchSpinner" class="w-4 h-4 animate-spin hidden" xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z">
+                    </path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Ringkasan AI -->
+        <div id="summarySection" class="bg-white rounded shadow p-6 mb-6 hidden">
+            <h2 class="text-xl font-semibold mb-2">Ringkasan AI</h2>
+            <!-- 🌀 Shimmer Placeholder -->
+            <div id="summarySkeleton" class="space-y-2">
+                <div class="h-4 rounded shimmer w-3/4"></div>
+                <div class="h-4 rounded shimmer w-full"></div>
+                <div class="h-4 rounded shimmer w-5/6"></div>
+                <div class="h-4 rounded shimmer w-2/3"></div>
+            </div>
+            <!-- ✅ Ringkasan hasil -->
+            <div id="summaryContent" class="prose prose-sm max-w-none leading-relaxed hidden"></div>
+        </div>
+
+        <!-- Hasil Pencarian -->
+        <div id="resultsSection" class="bg-white rounded shadow p-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Hasil Pencarian</h2>
+            <!-- 🌀 Shimmer Placeholder Hasil -->
+            <div id="resultsSkeleton" class="space-y-4">
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 rounded bg-gray-200 shimmer"></div>
+                    <div class="flex-1 space-y-2">
+                        <div class="h-4 w-1/2 rounded shimmer"></div>
+                        <div class="h-3 w-full rounded shimmer"></div>
+                        <div class="h-3 w-5/6 rounded shimmer"></div>
+                    </div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 rounded bg-gray-200 shimmer"></div>
+                    <div class="flex-1 space-y-2">
+                        <div class="h-4 w-2/3 rounded shimmer"></div>
+                        <div class="h-3 w-4/5 rounded shimmer"></div>
+                        <div class="h-3 w-1/2 rounded shimmer"></div>
+                    </div>
+                </div>
+                <div class="flex items-start gap-4">
+                    <div class="w-14 h-14 rounded bg-gray-200 shimmer"></div>
+                    <div class="flex-1 space-y-2">
+                        <div class="h-4 w-2/3 rounded shimmer"></div>
+                        <div class="h-3 w-4/5 rounded shimmer"></div>
+                        <div class="h-3 w-1/2 rounded shimmer"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- ✅ Daftar hasil -->
+            <div id="resultsList" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <script>
+        function renderResults(results) {
+            const resultsHtml = results.map(r => `
+                <div class="flex items-start gap-4 border-b pb-4">
+                  <img src="${r.icon}" alt="${r.nama}" class="w-14 h-14 object-contain rounded bg-gray-100" />
+                  <div>
+                    <h3 class="font-semibold text-lg">${r.nama}</h3>
+                    <p class="text-sm text-gray-600 mt-1">${r.deskripsi}</p>
+                    <a href="${r.url}" target="_blank" class="text-blue-600 text-sm mt-1 inline-block hover:underline">
+                      Kunjungi layanan →
+                    </a>
+                  </div>
+                </div>
+              `).join('')
+
+            $('#resultsList').html(resultsHtml).show()
+            $('#resultsSkeleton').hide() // Sembunyikan shimmer!
+            $('#resultsSection').removeClass('hidden')
+        }
+
+        function runSearchStream(query) {
+            // Tampilkan section + shimmer, sembunyikan hasil
+            $('#resultsSection').removeClass('hidden')
+            $('#resultsSkeleton').show()
+            $('#resultsList').hide()
+
+            // Untuk summary shimmer
+            $('#summarySection').removeClass('hidden')
+            $('#summarySkeleton').show()
+            $('#summaryContent').hide()
+
+            const source = new EventSource('http://localhost:3333/api/layanan/semantic-search-ai-stream?' + new URLSearchParams({
+                query: query,
+                limit: 5
+            }))
+
+            source.addEventListener('results', function (e) {
+                const data = JSON.parse(e.data)
+                renderResults(data.results)
+            })
+
+            source.addEventListener('summary', function (e) {
+                const data = JSON.parse(e.data)
+                const summaryHtml = marked.parse(data.summary || '')
+
+                // ✅ Sembunyikan shimmer, tampilkan hasil
+                $('#summarySkeleton').hide()
+                $('#summaryContent').html(summaryHtml).show()
+                source.close()
+                resetButton()
+            })
+
+            source.addEventListener('error', function (e) {
+                console.error('SSE error:', e)
+                $('#summarySkeleton').hide()
+                $('#summaryContent').html('<em>Gagal memuat ringkasan.</em>').show()
+                $('#resultsSkeleton').hide()
+                $('#resultsList').html('<div class="text-red-600">Gagal memuat hasil pencarian.</div>').show()
+                source.close()
+                resetButton()
+            })
+        }
+
+        function resetButton() {
+            $('#searchBtn').removeAttr('disabled').removeClass('opacity-50 cursor-not-allowed')
+            $('#searchSpinner').addClass('hidden')
+            $('#searchText').text('Search')
+        }
+
+        $('#searchBtn').on('click', function () {
+            const query = $('#queryInput').val().trim()
+            if (!query) return alert('Masukkan kata kunci pencarian')
+
+            // Aktifkan loading UI
+            $('#searchBtn').attr('disabled', true).addClass('opacity-50 cursor-not-allowed')
+            $('#searchSpinner').removeClass('hidden')
+            $('#searchText').text('Loading...')
+
+            runSearchStream(query)
+        })
+
+        // Optional: Enter key juga trigger search
+        $('#queryInput').on('keydown', function (e) {
+            if (e.key === 'Enter') {
+                $('#searchBtn').click()
+            }
+        })
+    </script>
+</body>
+
+</html>
