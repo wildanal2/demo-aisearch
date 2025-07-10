@@ -101,7 +101,7 @@
         function renderResults(results) {
             const resultsHtml = results.map(r => `
                 <div class="flex items-start gap-4 border-b pb-4">
-                  <img src="${r.icon}" alt="${r.nama}" class="w-14 h-14 object-contain rounded bg-gray-100" />
+                  <img src="${r.image}" alt="${r.nama}" class="w-14 h-14 object-contain rounded bg-gray-100" />
                   <div>
                     <h3 class="font-semibold text-lg">${r.nama}</h3>
                     <p class="text-sm text-gray-600 mt-1">${r.deskripsi}</p>
@@ -128,15 +128,15 @@
             $('#summarySkeleton').show()
             $('#summaryContent').hide()
 
-            const source = new EventSource('http://localhost:3333/api/public/search/semantic-search-ai-stream?' + new URLSearchParams({
-                query: query,
+            const source = new EventSource('http://localhost:3333/api/public/search/semantic-search?' + new URLSearchParams({
+                search: query,
                 limit: 5
             }))
 
             source.addEventListener('results', function (e) {
                 const data = JSON.parse(e.data)
-                console.log('Received results:', data.results)
-                renderResults(data.results)
+                console.log('Received results:', data.data)
+                renderResults(data.data)
             })
 
             source.addEventListener('summary', function (e) {
