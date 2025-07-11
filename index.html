@@ -128,7 +128,7 @@
             $('#summarySkeleton').show()
             $('#summaryContent').hide()
 
-            const source = new EventSource('http://localhost:3333/api/public/search/semantic-search?' + new URLSearchParams({
+            const source = new EventSource('https://api.majadigidev.jatimprov.go.id/api/public/search/semantic-search?' + new URLSearchParams({
                 search: query,
                 limit: 5
             }))
@@ -142,7 +142,7 @@
             source.addEventListener('summary', function (e) {
                 const data = JSON.parse(e.data)
                 const summaryHtml = marked.parse(data.summary || '')
-
+                console.log('Received summary:', summaryHtml)
                 // ✅ Sembunyikan shimmer, tampilkan hasil
                 $('#summarySkeleton').hide()
                 $('#summaryContent').html(summaryHtml).show()
